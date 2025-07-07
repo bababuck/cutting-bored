@@ -22,6 +22,8 @@ include_directories(${PROJECT_SOURCE_DIR})
 include_directories(${PROJECT_SOURCE_DIR}/../llvm-project)
 include_directories(${PROJECT_BINARY_DIR})
 
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
+
 add_subdirectory(tests)
 add_subdirectory(tools)
 add_subdirectory(lib)
