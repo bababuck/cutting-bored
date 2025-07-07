@@ -12,6 +12,8 @@ def CuttingBored_Dialect : Dialect {
   }];
 
   let cppNamespace = "::mlir::cuttingbored";
+
+  let useDefaultTypePrinterParser = 1;
 }
 
 #endif  // LIB_DIALECT_CUTTINGBORED_CUTTINGBOREDDIALECT_TD_
