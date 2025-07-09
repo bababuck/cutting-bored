@@ -16,7 +16,8 @@ def Board : CuttingBored_Type<"Board", "board"> {
     A type for cutting board and sub-cutting boards.
   }];
 
-  let assemblyFormat = "";
+  let parameters = (ins "int":$rows, "int":$columns, ArrayRefParameter<"int">:$squares);
+  let assemblyFormat = "`<` $rows `x` $columns `:` `[` $squares `]` `>`";
 }
 
 #endif  // LIB_DIALECT_CUTTINGBORED_CUTTINGBOREDTYPES_TD_
