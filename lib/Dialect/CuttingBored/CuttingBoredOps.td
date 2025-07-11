@@ -15,9 +15,9 @@ def CuttingBored_Build : Op<CuttingBored_Dialect, "build"> {
 
 def CuttingBored_InsertColumn : Op<CuttingBored_Dialect, "insert_column"> {
   let summary = "Add a single colored column into the board.";
-  let arguments = (ins Board:$full);
-  let results = (outs Board:$partial, Board:$column);
-  let assemblyFormat = "$full attr-dict `:` `(` type($full) `)` `->` type($partial) `,` type($column)";
+  let arguments = (ins Board:$partial, Board:$column);
+  let results = (outs Board:$full);
+  let assemblyFormat = "$partial  attr-dict `,` $column `:` `(` type($partial) `,` type($column) `)` `->` type($full)";
 }
 
 def CuttingBoard_ColumnOp : Op<CuttingBored_Dialect, "column"> {
