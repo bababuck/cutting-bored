@@ -3,6 +3,8 @@
 
 include "CuttingBoredDialect.td"
 include "mlir/IR/AttrTypeBase.td"
+include "mlir/IR/BuiltinTypes.td"
+include "mlir/IR/BuiltinAttributes.td"
 
 // A base class for all types in this dialect
 class CuttingBored_Type<string name, string typeMnemonic> : TypeDef<CuttingBored_Dialect, name> {
