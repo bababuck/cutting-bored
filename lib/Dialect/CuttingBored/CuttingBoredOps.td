@@ -11,6 +11,7 @@ def CuttingBored_Build : Op<CuttingBored_Dialect, "build"> {
   let arguments = (ins);
   let results = (outs Board:$to_build);
   let assemblyFormat = "attr-dict `:` `(` `)` `->` type($to_build) ";
+  let hasCanonicalizer = 1;
 }
 
 def CuttingBored_InsertColumn : Op<CuttingBored_Dialect, "insert_column"> {
