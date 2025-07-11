@@ -8,9 +8,9 @@ include "mlir/Interfaces/SideEffectInterfaces.td"
 
 def CuttingBored_Build : Op<CuttingBored_Dialect, "build"> {
   let summary = "Create a cutting board, top level instruction.";
-  let arguments = (ins Board:$to_build);
-  let results = (outs);
-  let assemblyFormat = "$to_build attr-dict `:` `(` type($to_build) `)`";
+  let arguments = (ins);
+  let results = (outs Board:$to_build);
+  let assemblyFormat = "attr-dict `:` `(` `)` `->` type($to_build) ";
 }
 
 def CuttingBored_InsertColumn : Op<CuttingBored_Dialect, "insert_column"> {
