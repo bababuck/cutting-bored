@@ -19,4 +19,9 @@ module {
     %0 = cuttingbored.column : () -> !cuttingbored.board<5 x 1 : [0, 1, 0, 1, 0]>
     func.return %0 : !cuttingbored.board<5 x 1 : [0, 1, 0, 1, 0]>
   }
+
+  func.func @rotate_row(%arg0: !cuttingbored.board<5 x 5 : [0, 1, 2, 3, 4]>) -> !cuttingbored.board<5 x 5 : [0, 8, 2, 3, 4]> {
+    %0 = cuttingbored.rotate_row %arg0 : (!cuttingbored.board<5 x 5 : [0, 1, 2, 3, 4]>) -> !cuttingbored.board<5 x 5 : [0, 8, 2, 3, 4]>
+    return %0 : !cuttingbored.board<5 x 5 : [0, 8, 2, 3, 4]>
+  }
 }
