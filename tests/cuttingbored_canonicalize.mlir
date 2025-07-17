@@ -13,4 +13,9 @@ module {
     %0 = cuttingbored.build : () -> !cuttingbored.board<5 x 5 : [0, 1, 2, 3, 4]>
     func.return %0 : !cuttingbored.board<5 x 5 : [0, 1, 2, 3, 4]>
   }
+
+  func.func @canonicalize_checkerboard() -> (!cuttingbored.board<3 x 3 : [5, 2, 5]>) {
+    %0 = cuttingbored.build : () -> !cuttingbored.board<3 x 3 : [5, 2, 5]>
+    func.return %0 : !cuttingbored.board<3 x 3 : [5, 2, 5]>
+  }
 }
