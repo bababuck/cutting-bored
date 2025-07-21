@@ -71,23 +71,20 @@ struct InsertColumnMatch : public OpRewritePattern<BuildOp> {
 
 
   static Operation* BuildRotateSeq(PatternRewriter &rewriter, std::vector<int> &NewBoardSquareValues, const int Rows, const int Columns, const uint64_t MaxHash, llvm::SmallVector<int> &RotatedSquares, BuildOp &Op, int Row) {
-    llvm::errs() << Row << "\n";
-    llvm::errs() << MaxHash << "\n";
       if (Row == Rows)
         return nullptr;
       if ((MaxHash >> Row) & 1) {
-        NewBoardSquareValues[Row] = RotatedSquares[Row];
-        llvm::ArrayRef<int> NewBoardSquares(NewBoardSquareValues);
-        Operation *InputOp = BuildRotateSeq(rewriter, NewBoardSquareValues, Rows, Columns, MaxHash, RotatedSquares, Op, ++Row);
-        BoardType NewBoardType = BoardType::get(rewriter.getContext(), Rows, Columns, NewBoardSquares);
+        std::vector<int> NextBoardSquareValues = NewBoardSquareValues;
+        NextBoardSquareValues[Row] = RotatedSquares[Row];
+           Operation *InputOp = BuildRotateSeq(rewriter, NextBoardSquareValues, Rows, Columns, MaxHash, RotatedSquares, Op, ++Row);
         if (InputOp == nullptr) {
-          return rewriter.create(Op.getLoc(), rewriter.getStringAttr("cuttingbored.build"), {}, {NewBoardType});
-        } else {
-          mlir::Value RowI32 = rewriter.create<mlir::arith::ConstantOp>(
-                                    Op.getLoc(),
-                                    rewriter.getI32IntegerAttr(Row));
-          return rewriter.create(Op.getLoc(), rewriter.getStringAttr("cuttingbored.rotate_row"), {RowI32, InputOp->getResult(0)}, {NewBoardType});
+          llvm::ArrayRef<int> NextBoardSquares(NextBoardSquareValues);
+          BoardType NewBoardType = BoardType::get(rewriter.getContext(), Rows, Columns, NextBoardSquares);
+          InputOp = rewriter.create(Op.getLoc(), rewriter.getStringAttr("cuttingbored.build"), {}, {NewBoardType});
         }
+        llvm::ArrayRef<int> NewBoardSquares(NewBoardSquareValues);
+        BoardType NewBoardType = BoardType::get(rewriter.getContext(), Rows, Columns, NewBoardSquares);
+        return rewriter.create(Op.getLoc(), rewriter.getStringAttr("cuttingbored.rotate_row"), {InputOp->getResult(0)}, {NewBoardType});
       } else {
         return BuildRotateSeq(rewriter, NewBoardSquareValues, Rows, Columns, MaxHash, RotatedSquares, Op, ++Row);;
       }
@@ -150,12 +147,12 @@ struct RotateRowMatch : public OpRewritePattern<BuildOp> {
         if (GoodAsIs && GoodReversed) {
           std::vector<uint64_t> NewHashes = CurrRotateHashes;
           for (auto &Hash : NewHashes) {
-            Hash |= (1 >> j);
+            Hash |= (1 << j);
           }
           CurrRotateHashes.insert(CurrRotateHashes.end(), NewHashes.begin(), NewHashes.end());
         } else if (GoodReversed) {
           for (auto &Hash : CurrRotateHashes) {
-            Hash |= (1 >> j);
+            Hash |= (1 << j);
           }
         } else if (!GoodAsIs) {
           PossibleToRemove = false;
@@ -172,11 +169,9 @@ struct RotateRowMatch : public OpRewritePattern<BuildOp> {
         }
       }
     }
-    llvm::errs() << MaxCount;
     if (MaxCount == 0) return failure();
     std::vector<int> NewBoardSquareValues(Squares);
     Operation *RotateSeq = BuildRotateSeq(rewriter, NewBoardSquareValues, Rows, Columns, MaxHash, RotatedSquares, op, 1);
-    llvm::errs() << RotateSeq << "\n";
     rewriter.replaceOp(op, RotateSeq);
     //return failure();
     return success();
