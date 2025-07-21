@@ -60,7 +60,7 @@ struct InsertColumnMatch : public OpRewritePattern<BuildOp> {
     llvm::ArrayRef<int> NewColumnSquares(NewColumnSquareValues);
 
     BoardType NewBoardType = BoardType::get(rewriter.getContext(), Rows, Columns - 1, NewBoardSquares);
-    BoardType NewColumnType = BoardType::get(rewriter.getContext(), Rows, 1, NewBoardSquares);
+    BoardType NewColumnType = BoardType::get(rewriter.getContext(), Rows, 1, NewColumnSquares);
     Operation *NewBuild = rewriter.create(op.getLoc(), rewriter.getStringAttr("cuttingbored.build"), {}, {NewBoardType});
     Operation *NewColumn = rewriter.create(op.getLoc(), rewriter.getStringAttr("cuttingbored.column"), {}, {NewColumnType});
     Operation *NewInsertColumn = rewriter.create(op.getLoc(), rewriter.getStringAttr("cuttingbored.insert_column"), {NewBuild->getResult(0), NewColumn->getResult(0)}, {InputBoardType});
