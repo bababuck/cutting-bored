@@ -18,8 +18,8 @@ module {
 // CHECK:           %[[VAL_0:.*]] = cuttingbored.build : () -> <3 x 3 : [5, 2, 5]>
 // CHECK:           return %[[VAL_0]] : !cuttingbored.board<3 x 3 : [5, 2, 5]>
 // CHECK:         }
-  func.func @canonicalize_checkerboard() -> (!cuttingbored.board<3 x 3 : [5, 2, 5]>) {
-    %0 = cuttingbored.build : () -> !cuttingbored.board<3 x 3 : [5, 2, 5]>
-    func.return %0 : !cuttingbored.board<3 x 3 : [5, 2, 5]>
+  func.func @canonicalize_checkerboard() -> (!cuttingbored.board<4 x 4 : [5, 10, 5, 10]>) {
+    %0 = cuttingbored.build : () -> !cuttingbored.board<4 x 4 : [5, 10, 5, 10]>
+    func.return %0 : !cuttingbored.board<4 x 4 : [5, 10, 5, 10]>
   }
 }
