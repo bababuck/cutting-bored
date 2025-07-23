@@ -69,23 +69,50 @@ struct InsertColumnMatch : public OpRewritePattern<BuildOp> {
   }
 };
 
-static Operation* BuildRotateSeq(const std::vector<int> SquareValues, const int Rows, const int Columns, const uint64_t RotateMask, PatternRewriter &Rewriter, const Location &Loc, const llvm::SmallVector<int> &RotatedSquares) {
-  std::vector<int> NewSquareValues = SquareValues;
-  for (int Row = 1; Row < Rows; ++Row) {
+class Board {
+public:
+  int Columns;
+  int Rows;
+  std::vector<int> Squares;
+public:
+  Board(const int Columns_, const int Rows_, const std::vector<int> &Squares_):Columns(Columns_), Rows(Rows_), Squares(Squares_){}
+  Board(const Board &other):Columns(other.Columns), Rows(other.Rows), Squares(other.Squares) {}
+
+  int getSquare(int Row, int Column) {
+    return (Squares[Row] >> Column) & 1;
+  }
+  void rotateRow(int Row) {
+    uint64_t EndMask = 1 << (Columns - 1);
+    uint64_t StartMask = 1;
+    uint64_t Rotated = 0;
+    uint64_t RowData = Squares[Row];
+    for (int i = 0; i < Columns; ++i) {
+      if (RowData & StartMask) {
+        Rotated |= EndMask;
+      }
+      EndMask >>= 1;
+      StartMask <<= 1;
+    }
+    Squares[Row] = Rotated;
+  }
+};
+
+static Operation* BuildRotateSeq(Board CurrBoard, const uint64_t RotateMask, PatternRewriter &Rewriter, const Location &Loc) {
+  for (int Row = 1; Row < CurrBoard.Rows; ++Row) {
     if ((RotateMask >> Row) & 1) {
-      NewSquareValues[Row] = RotatedSquares[Row];
+      CurrBoard.rotateRow(Row);
     }
   }
 
   Operation *PrevOp = nullptr;
-  for (int Row = Rows - 1; Row > 0; --Row) {
+  for (int Row = CurrBoard.Rows - 1; Row > 0; --Row) {
     if ((RotateMask >> Row) & 1) {
       if (!PrevOp) {
-        BoardType NewBoardType = BoardType::get(Rewriter.getContext(), Rows, Columns, llvm::ArrayRef<int>(NewSquareValues));
+        BoardType NewBoardType = BoardType::get(Rewriter.getContext(), CurrBoard.Rows, CurrBoard.Columns, llvm::ArrayRef<int>(CurrBoard.Squares));
         PrevOp = Rewriter.create(Loc, Rewriter.getStringAttr("cuttingbored.build"), {}, {NewBoardType});
       }
-      NewSquareValues[Row] = SquareValues[Row];
-      BoardType NewBoardType = BoardType::get(Rewriter.getContext(), Rows, Columns, llvm::ArrayRef<int>(NewSquareValues));
+      CurrBoard.rotateRow(Row);
+      BoardType NewBoardType = BoardType::get(Rewriter.getContext(), CurrBoard.Rows, CurrBoard.Columns, llvm::ArrayRef<int>(CurrBoard.Squares));
       PrevOp = Rewriter.create(Loc, Rewriter.getStringAttr("cuttingbored.rotate_row"), {PrevOp->getResult(0)}, {NewBoardType});
     }
   }
@@ -111,48 +138,38 @@ struct RotateRowMatch : public OpRewritePattern<BuildOp> {
     if (Columns == 0)
       return failure();
 
-    auto RotateRow = [Columns](uint64_t RowData) -> uint64_t {
-      uint64_t EndMask = 1 << (Columns - 1);
-      uint64_t StartMask = 1;
-      uint64_t Rotated = 0;
-      for (int i = 0; i < Columns; ++i) {
-        if (RowData & StartMask) {
-          Rotated |= EndMask;
-        }
-        EndMask >>= 1;
-        StartMask <<= 1;
-      }
-      return Rotated;
-    };
-    for (auto &Row : RotatedSquares) {
-      Row = RotateRow(Row);
+    Board CurrBoard(Columns, Rows, Squares);
+    Board RotatedBoard(CurrBoard);
+
+    for (int Row = 0; Row < Rows; ++Row) {
+      RotatedBoard.rotateRow(Row);
     }
 
-    std::unordered_map<uint64_t, int> RotateHashCounts;
-    uint64_t MaxHash;
+    std::unordered_map<uint64_t, int> RotateMaskCounts;
+    uint64_t MaxMask;
     uint64_t MaxCount = 0;
     for (int i = 0; i < Columns; ++i) {
       // Assume the first row will not be rotated
       // That is we will try to match it's color
-      auto GetSquare = [&Squares](const int Row, const int Column) -> int {
-        return (Squares[Row] >> Column) & 1;
-      };
-      int Color = GetSquare(0, i);
+      int Color = CurrBoard.getSquare(0, i);
+
+      // Find all possible rotate/don't rotate combinations to find which
+      // if any will allow for removal of this column. That is, which rotations
+      // will lead to the column to be all of one color.
       bool PossibleToRemove = true;
-      std::vector<uint64_t> CurrRotateHashes(1, 0);
+      std::vector<uint64_t> CurrRotateMasks(1, 0);
       for (int j = 1; j < Rows; ++j) {
-        bool GoodAsIs = GetSquare(j, i) == Color;
-        // Can't rotate if middle column
-        bool GoodReversed = ((Columns - i - 1) != i) && (GetSquare(j, Columns - i - 1) == Color);
+        bool GoodAsIs = CurrBoard.getSquare(j, i) == Color;
+        bool GoodReversed = RotatedBoard.getSquare(j, i) == Color;
         if (GoodAsIs && GoodReversed) {
-          std::vector<uint64_t> NewHashes = CurrRotateHashes;
-          for (auto &Hash : NewHashes) {
-            Hash |= (1 << j);
+          std::vector<uint64_t> NewMasks = CurrRotateMasks;
+          for (auto &Mask : NewMasks) {
+            Mask |= (1 << j);
           }
-          CurrRotateHashes.insert(CurrRotateHashes.end(), NewHashes.begin(), NewHashes.end());
+          CurrRotateMasks.insert(CurrRotateMasks.end(), NewMasks.begin(), NewMasks.end());
         } else if (GoodReversed) {
-          for (auto &Hash : CurrRotateHashes) {
-            Hash |= (1 << j);
+          for (auto &Mask : CurrRotateMasks) {
+            Mask |= (1 << j);
           }
         } else if (!GoodAsIs) {
           PossibleToRemove = false;
@@ -160,19 +177,21 @@ struct RotateRowMatch : public OpRewritePattern<BuildOp> {
         }
       }
       if (PossibleToRemove) {
-        for (auto &Hash : CurrRotateHashes) {
-          ++(RotateHashCounts[Hash]);
-          if (RotateHashCounts[Hash] > MaxCount) {
-            MaxCount = RotateHashCounts[Hash];
-            MaxHash = Hash;
+        // If at least one valid rotation scheme for this column, add the bitmasks
+        // to the overall bitmask collection, incrementing their counters
+        for (auto &Mask : CurrRotateMasks) {
+          ++(RotateMaskCounts[Mask]);
+          if (RotateMaskCounts[Mask] > MaxCount) {
+            MaxCount = RotateMaskCounts[Mask];
+            MaxMask = Mask;
           }
         }
       }
     }
     if (MaxCount == 0) return failure();
-    Operation *RotateSeq = BuildRotateSeq(std::vector<int>(Squares), Rows, Columns, MaxHash, rewriter, op.getLoc(), RotatedSquares);
+
+    Operation *RotateSeq = BuildRotateSeq(CurrBoard, MaxMask, rewriter, op.getLoc());
     rewriter.replaceOp(op, RotateSeq);
-    //return failure();
     return success();
   }
 };
