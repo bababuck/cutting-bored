@@ -139,58 +139,62 @@ struct RotateRowMatch : public OpRewritePattern<BuildOp> {
       return failure();
 
     Board CurrBoard(Columns, Rows, Squares);
-    Board RotatedBoard(CurrBoard);
+    auto FindBestRotation = [](Board &CurrBoard) -> std::pair<uint64_t, uint64_t> {
+      Board RotatedBoard(CurrBoard);
 
-    for (int Row = 0; Row < Rows; ++Row) {
-      RotatedBoard.rotateRow(Row);
-    }
+      for (int Row = 0; Row < CurrBoard.Rows; ++Row) {
+        RotatedBoard.rotateRow(Row);
+      }
 
-    std::unordered_map<uint64_t, int> RotateMaskCounts;
-    uint64_t MaxMask;
-    uint64_t MaxCount = 0;
-    for (int i = 0; i < Columns; ++i) {
-      // Assume the first row will not be rotated
-      // That is we will try to match it's color
-      int Color = CurrBoard.getSquare(0, i);
+      std::unordered_map<uint64_t, int> RotateMaskCounts;
+      uint64_t MaxMask;
+      uint64_t MaxCount = 0;
+      for (int i = 0; i < CurrBoard.Columns; ++i) {
+        // Assume the first row will not be rotated
+        // That is we will try to match it's color
+        int Color = CurrBoard.getSquare(0, i);
 
-      // Find all possible rotate/don't rotate combinations to find which
-      // if any will allow for removal of this column. That is, which rotations
-      // will lead to the column to be all of one color.
-      bool PossibleToRemove = true;
-      std::vector<uint64_t> CurrRotateMasks(1, 0);
-      for (int j = 1; j < Rows; ++j) {
-        bool GoodAsIs = CurrBoard.getSquare(j, i) == Color;
-        bool GoodReversed = RotatedBoard.getSquare(j, i) == Color;
-        if (GoodAsIs && GoodReversed) {
-          std::vector<uint64_t> NewMasks = CurrRotateMasks;
-          for (auto &Mask : NewMasks) {
-            Mask |= (1 << j);
+        // Find all possible rotate/don't rotate combinations to find which
+        // if any will allow for removal of this column. That is, which rotations
+        // will lead to the column to be all of one color.
+        bool PossibleToRemove = true;
+        std::vector<uint64_t> CurrRotateMasks(1, 0);
+        for (int j = 1; j < CurrBoard.Rows; ++j) {
+          bool GoodAsIs = CurrBoard.getSquare(j, i) == Color;
+          bool GoodReversed = RotatedBoard.getSquare(j, i) == Color;
+          if (GoodAsIs && GoodReversed) {
+            std::vector<uint64_t> NewMasks = CurrRotateMasks;
+            for (auto &Mask : NewMasks) {
+              Mask |= (1 << j);
+            }
+            CurrRotateMasks.insert(CurrRotateMasks.end(), NewMasks.begin(), NewMasks.end());
+          } else if (GoodReversed) {
+            for (auto &Mask : CurrRotateMasks) {
+              Mask |= (1 << j);
+            }
+          } else if (!GoodAsIs) {
+            PossibleToRemove = false;
+            break;
           }
-          CurrRotateMasks.insert(CurrRotateMasks.end(), NewMasks.begin(), NewMasks.end());
-        } else if (GoodReversed) {
+        }
+        if (PossibleToRemove) {
+          // If at least one valid rotation scheme for this column, add the bitmasks
+          // to the overall bitmask collection, incrementing their counters
           for (auto &Mask : CurrRotateMasks) {
-            Mask |= (1 << j);
-          }
-        } else if (!GoodAsIs) {
-          PossibleToRemove = false;
-          break;
-        }
-      }
-      if (PossibleToRemove) {
-        // If at least one valid rotation scheme for this column, add the bitmasks
-        // to the overall bitmask collection, incrementing their counters
-        for (auto &Mask : CurrRotateMasks) {
-          ++(RotateMaskCounts[Mask]);
-          if (RotateMaskCounts[Mask] > MaxCount) {
-            MaxCount = RotateMaskCounts[Mask];
-            MaxMask = Mask;
+            ++(RotateMaskCounts[Mask]);
+            if (RotateMaskCounts[Mask] > MaxCount) {
+              MaxCount = RotateMaskCounts[Mask];
+              MaxMask = Mask;
+            }
           }
         }
       }
-    }
+      return {MaxCount, MaxMask};
+    };
+    auto [MaxCount, MaxMask] = FindBestRotation(CurrBoard);
     if (MaxCount == 0) return failure();
 
-    Operation *RotateSeq = BuildRotateSeq(CurrBoard, MaxMask, rewriter, op.getLoc());
+    Operation *RotateSeq = BuildRotateSeq(CurrBoard, MaxMask, rewriter, op.getLoc(), true);
     rewriter.replaceOp(op, RotateSeq);
     return success();
   }
