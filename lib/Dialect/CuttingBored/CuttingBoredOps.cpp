@@ -81,7 +81,7 @@ public:
   int getSquare(int Row, int Column) {
     return (Squares[Row] >> Column) & 1;
   }
-  void rotateRow(int Row) {
+  void rotateRowOrColumn(int Row, bool RowWise) {
     uint64_t EndMask = 1 << (Columns - 1);
     uint64_t StartMask = 1;
     uint64_t Rotated = 0;
@@ -97,21 +97,22 @@ public:
   }
 };
 
-static Operation* BuildRotateSeq(Board CurrBoard, const uint64_t RotateMask, PatternRewriter &Rewriter, const Location &Loc) {
-  for (int Row = 1; Row < CurrBoard.Rows; ++Row) {
-    if ((RotateMask >> Row) & 1) {
-      CurrBoard.rotateRow(Row);
+static Operation* BuildRotateSeq(Board CurrBoard, const uint64_t RotateMask, PatternRewriter &Rewriter, const Location &Loc, bool RowWise) {
+  int Dimension = RowWise ? CurrBoard.Rows : CurrBoard.Columns;
+  for (int Dim = 1; Dim < Dimension; ++Dim) {
+    if ((RotateMask >> Dim) & 1) {
+      CurrBoard.rotateRowOrColumn(Dim, RowWise);
     }
   }
 
   Operation *PrevOp = nullptr;
-  for (int Row = CurrBoard.Rows - 1; Row > 0; --Row) {
-    if ((RotateMask >> Row) & 1) {
+  for (int Dim = Dimension - 1; Dim > 0; --Dim) {
+    if ((RotateMask >> Dim) & 1) {
       if (!PrevOp) {
         BoardType NewBoardType = BoardType::get(Rewriter.getContext(), CurrBoard.Rows, CurrBoard.Columns, llvm::ArrayRef<int>(CurrBoard.Squares));
         PrevOp = Rewriter.create(Loc, Rewriter.getStringAttr("cuttingbored.build"), {}, {NewBoardType});
       }
-      CurrBoard.rotateRow(Row);
+      CurrBoard.rotateRowOrColumn(Dim, RowWise);
       BoardType NewBoardType = BoardType::get(Rewriter.getContext(), CurrBoard.Rows, CurrBoard.Columns, llvm::ArrayRef<int>(CurrBoard.Squares));
       PrevOp = Rewriter.create(Loc, Rewriter.getStringAttr("cuttingbored.rotate_row"), {PrevOp->getResult(0)}, {NewBoardType});
     }
@@ -139,17 +140,19 @@ struct RotateRowMatch : public OpRewritePattern<BuildOp> {
       return failure();
 
     Board CurrBoard(Columns, Rows, Squares);
-    auto FindBestRotation = [](Board &CurrBoard) -> std::pair<uint64_t, uint64_t> {
+    auto FindBestRotation = [](Board &CurrBoard, bool RowWise) -> std::pair<uint64_t, uint64_t> {
       Board RotatedBoard(CurrBoard);
 
-      for (int Row = 0; Row < CurrBoard.Rows; ++Row) {
-        RotatedBoard.rotateRow(Row);
+      int RotateDimension = RowWise ? CurrBoard.Rows : CurrBoard.Columns;
+      int OtherDimension = RowWise ? CurrBoard.Columns : CurrBoard.Rows;
+      for (int Dim = 0; Dim < RotateDimension; ++Dim) {
+        RotatedBoard.rotateRowOrColumn(Dim, RowWise);
       }
 
       std::unordered_map<uint64_t, int> RotateMaskCounts;
       uint64_t MaxMask;
       uint64_t MaxCount = 0;
-      for (int i = 0; i < CurrBoard.Columns; ++i) {
+      for (int i = 0; i < OtherDimension; ++i) {
         // Assume the first row will not be rotated
         // That is we will try to match it's color
         int Color = CurrBoard.getSquare(0, i);
@@ -191,10 +194,11 @@ struct RotateRowMatch : public OpRewritePattern<BuildOp> {
       }
       return {MaxCount, MaxMask};
     };
-    auto [MaxCount, MaxMask] = FindBestRotation(CurrBoard);
+    bool RowWise = true;
+    auto [MaxCount, MaxMask] = FindBestRotation(CurrBoard, RowWise);
     if (MaxCount == 0) return failure();
 
-    Operation *RotateSeq = BuildRotateSeq(CurrBoard, MaxMask, rewriter, op.getLoc(), true);
+    Operation *RotateSeq = BuildRotateSeq(CurrBoard, MaxMask, rewriter, op.getLoc(), RowWise);
     rewriter.replaceOp(op, RotateSeq);
     return success();
   }
