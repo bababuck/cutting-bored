@@ -42,4 +42,11 @@ def CuttingBored_RotateRowOp : Op<CuttingBored_Dialect, "rotate_row"> {
   let assemblyFormat = "$InBoard  attr-dict `:` `(` type($InBoard) `)` `->` type($OutBoard)";
 }
 
+def CuttingBored_RotateColumnOp : Op<CuttingBored_Dialect, "rotate_column"> {
+  let summary = "Rotate a single column in the cutting board.";
+  let arguments = (ins Board:$InBoard);
+  let results = (outs Board:$OutBoard);
+  let assemblyFormat = "$InBoard  attr-dict `:` `(` type($InBoard) `)` `->` type($OutBoard)";
+}
+
 #endif  // LIB_DIALECT_CUTTINGBORED_CUTTINGBOREDOPS_TD_
