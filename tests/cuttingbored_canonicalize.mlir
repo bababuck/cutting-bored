@@ -44,4 +44,24 @@ module {
     %0 = cuttingbored.build : () -> !cuttingbored.board<4 x 4 : [5, 10, 5, 10]>
     func.return %0 : !cuttingbored.board<4 x 4 : [5, 10, 5, 10]>
   }
+
+// CHECK-LABEL:   func.func @canonicalize_checkerboard_rectangle() -> !cuttingbored.board<6 x 4 : [5, 10, 5, 10, 5, 10]> {
+// CHECK:           %[[VAL_0:.*]] = cuttingbored.build : () -> <6 x 0 : [0, 0, 0, 0, 0, 0]>
+// CHECK:           %[[VAL_1:.*]] = cuttingbored.column : () -> <6 x 1 : [0, 0, 0, 0, 0, 0]>
+// CHECK:           %[[VAL_2:.*]] = cuttingbored.insert_column %[[VAL_0]], %[[VAL_1]] : (<6 x 0 : [0, 0, 0, 0, 0, 0]>, <6 x 1 : [0, 0, 0, 0, 0, 0]>) -> <6 x 1 : [0, 0, 0, 0, 0, 0]>
+// CHECK:           %[[VAL_3:.*]] = cuttingbored.column : () -> <6 x 1 : [1, 1, 1, 1, 1, 1]>
+// CHECK:           %[[VAL_4:.*]] = cuttingbored.insert_column %[[VAL_2]], %[[VAL_3]] : (<6 x 1 : [0, 0, 0, 0, 0, 0]>, <6 x 1 : [1, 1, 1, 1, 1, 1]>) -> <6 x 2 : [1, 1, 1, 1, 1, 1]>
+// CHECK:           %[[VAL_5:.*]] = cuttingbored.column : () -> <6 x 1 : [0, 0, 0, 0, 0, 0]>
+// CHECK:           %[[VAL_6:.*]] = cuttingbored.insert_column %[[VAL_4]], %[[VAL_5]] : (<6 x 2 : [1, 1, 1, 1, 1, 1]>, <6 x 1 : [0, 0, 0, 0, 0, 0]>) -> <6 x 3 : [2, 2, 2, 2, 2, 2]>
+// CHECK:           %[[VAL_7:.*]] = cuttingbored.column : () -> <6 x 1 : [1, 1, 1, 1, 1, 1]>
+// CHECK:           %[[VAL_8:.*]] = cuttingbored.insert_column %[[VAL_6]], %[[VAL_7]] : (<6 x 3 : [2, 2, 2, 2, 2, 2]>, <6 x 1 : [1, 1, 1, 1, 1, 1]>) -> <6 x 4 : [5, 5, 5, 5, 5, 5]>
+// CHECK:           %[[VAL_9:.*]] = cuttingbored.rotate_row %[[VAL_8]] : (<6 x 4 : [5, 5, 5, 5, 5, 5]>) -> <6 x 4 : [5, 5, 5, 5, 5, 10]>
+// CHECK:           %[[VAL_10:.*]] = cuttingbored.rotate_row %[[VAL_9]] : (<6 x 4 : [5, 5, 5, 5, 5, 10]>) -> <6 x 4 : [5, 5, 5, 10, 5, 10]>
+// CHECK:           %[[VAL_11:.*]] = cuttingbored.rotate_row %[[VAL_10]] : (<6 x 4 : [5, 5, 5, 10, 5, 10]>) -> <6 x 4 : [5, 10, 5, 10, 5, 10]>
+// CHECK:           return %[[VAL_11]] : !cuttingbored.board<6 x 4 : [5, 10, 5, 10, 5, 10]>
+// CHECK:         }
+  func.func @canonicalize_checkerboard_rectangle() -> (!cuttingbored.board<6 x 4 : [5, 10, 5, 10, 5, 10]>) {
+    %0 = cuttingbored.build : () -> !cuttingbored.board<6 x 4 : [5, 10, 5, 10, 5, 10]>
+    func.return %0 : !cuttingbored.board<6 x 4 : [5, 10, 5, 10, 5, 10]>
+  }
 }
