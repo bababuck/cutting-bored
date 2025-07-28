@@ -21,6 +21,13 @@ def CuttingBored_InsertColumnOp : Op<CuttingBored_Dialect, "insert_column"> {
   let assemblyFormat = "$partial  attr-dict `,` $column `:` `(` type($partial) `,` type($column) `)` `->` type($full)";
 }
 
+def CuttingBored_InsertRowOp : Op<CuttingBored_Dialect, "insert_row"> {
+  let summary = "Add a single colored row into the board.";
+  let arguments = (ins Board:$partial, Board:$row);
+  let results = (outs Board:$full);
+  let assemblyFormat = "$partial  attr-dict `,` $row `:` `(` type($partial) `,` type($row) `)` `->` type($full)";
+}
+
 def CuttingBoard_ColumnOp : Op<CuttingBored_Dialect, "column"> {
   let summary = "Create single colored column";
   let arguments = (ins);

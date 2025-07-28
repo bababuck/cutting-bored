@@ -69,6 +69,51 @@ struct InsertColumnMatch : public OpRewritePattern<BuildOp> {
   }
 };
 
+// Remove a column if solid color
+struct InsertRowMatch : public OpRewritePattern<BuildOp> {
+  InsertRowMatch(mlir::MLIRContext *context)
+      : OpRewritePattern<BuildOp>(context, /*benefit=*/1) {}
+
+  virtual LogicalResult matchAndRewrite(BuildOp op,
+                                        PatternRewriter &rewriter) const override {
+    Value InputBoard = op.getToBuild();
+
+    assert(InputBoard.hasOneUse() &&
+           "Build operation should only ever operate on board with single use");
+
+    auto InputBoardType = dyn_cast<BoardType>(InputBoard.getType());
+    auto Rows = InputBoardType.getRows();
+    auto Columns = InputBoardType.getColumns();
+    auto Squares = InputBoardType.getSquares();
+    if (Columns == 0)
+      return failure();
+
+
+    int RowToRemove = -1;
+    for (int Row = 0; Row < Rows; ++Row) {
+      if ((Squares[Row] == 0) ||
+          (Squares[Row] == ((1 << Columns) - 1)))
+          RowToRemove = Row;
+    }
+    if (RowToRemove == -1) return failure();
+
+    std::vector<int> NewBoardSquareValues(Squares);
+    std::vector<int> NewRowSquareValues(1, Squares[RowToRemove]);
+    NewBoardSquareValues.erase(NewBoardSquareValues.begin() + RowToRemove);
+
+    llvm::ArrayRef<int> NewBoardSquares(NewBoardSquareValues);
+    llvm::ArrayRef<int> NewRowSquares(NewRowSquareValues);
+
+    BoardType NewBoardType = BoardType::get(rewriter.getContext(), Rows - 1, Columns, NewBoardSquares);
+    BoardType NewRowType = BoardType::get(rewriter.getContext(), 1, Columns, NewRowSquares);
+    Operation *NewBuild = rewriter.create(op.getLoc(), rewriter.getStringAttr("cuttingbored.build"), {}, {NewBoardType});
+    Operation *NewRow = rewriter.create(op.getLoc(), rewriter.getStringAttr("cuttingbored.column"), {}, {NewRowType});
+    Operation *NewInsertRow = rewriter.create(op.getLoc(), rewriter.getStringAttr("cuttingbored.insert_row"), {NewBuild->getResult(0), NewRow->getResult(0)}, {InputBoardType});
+    rewriter.replaceOp(op, NewInsertRow);
+    return success();
+  }
+};
+
 class Board {
 public:
   int Columns;
@@ -208,6 +253,7 @@ struct RotateRowMatch : public OpRewritePattern<BuildOp> {
 void BuildOp::getCanonicalizationPatterns(::mlir::RewritePatternSet &results,
                                         ::mlir::MLIRContext *context) {
   results.add<InsertColumnMatch>(context);
+  results.add<InsertRowMatch>(context);
   results.add<RotateRowMatch>(context);
 }
 
