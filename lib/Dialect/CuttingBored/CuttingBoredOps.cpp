@@ -123,10 +123,35 @@ public:
   Board(const int Columns_, const int Rows_, const std::vector<int> &Squares_):Columns(Columns_), Rows(Rows_), Squares(Squares_){}
   Board(const Board &other):Columns(other.Columns), Rows(other.Rows), Squares(other.Squares) {}
 
-  int getSquare(int Row, int Column) {
+  int getSquare(int Row, int Column, bool RowWise = true) {
+    if (!RowWise)
+      std::swap(Row, Column);
     return (Squares[Row] >> Column) & 1;
   }
-  void rotateRowOrColumn(int Row, bool RowWise) {
+
+  void setSquare(int Row, int Column, int Color) {
+    uint64_t ClearMask = ~(1 << Column);
+    uint64_t ColorMask = Color << Column;
+    Squares[Row] = (Squares[Row] & ClearMask) | ColorMask;
+  }
+
+  void rotateRowOrColumn(int Dim, bool RowWise) {
+    if (RowWise)
+      rotateRow(Dim);
+    else
+      rotateColumn(Dim);
+  }
+
+  void rotateColumn(int Column) {
+    for (int Row = 0; Row < (Rows / 2); ++Row) {
+      int LowColor = getSquare(Row, Column);
+      int HighColor = getSquare(Rows - Row - 1, Column);
+      setSquare(Row, Column, HighColor);
+      setSquare(Rows - Row - 1, Column, LowColor);
+    }
+  }
+
+  void rotateRow(int Row) {
     uint64_t EndMask = 1 << (Columns - 1);
     uint64_t StartMask = 1;
     uint64_t Rotated = 0;
@@ -159,7 +184,8 @@ static Operation* BuildRotateSeq(Board CurrBoard, const uint64_t RotateMask, Pat
       }
       CurrBoard.rotateRowOrColumn(Dim, RowWise);
       BoardType NewBoardType = BoardType::get(Rewriter.getContext(), CurrBoard.Rows, CurrBoard.Columns, llvm::ArrayRef<int>(CurrBoard.Squares));
-      PrevOp = Rewriter.create(Loc, Rewriter.getStringAttr("cuttingbored.rotate_row"), {PrevOp->getResult(0)}, {NewBoardType});
+      auto OpName = RowWise ? "cuttingbored.rotate_row" : "cuttingbored.rotate_column";
+      PrevOp = Rewriter.create(Loc, Rewriter.getStringAttr(OpName), {PrevOp->getResult(0)}, {NewBoardType});
     }
   }
   return PrevOp;
@@ -181,7 +207,7 @@ struct RotateRowMatch : public OpRewritePattern<BuildOp> {
     const auto Columns = InputBoardType.getColumns();
     const auto Squares = InputBoardType.getSquares();
     llvm::SmallVector<int> RotatedSquares(Squares.begin(), Squares.end());
-    if (Columns == 0)
+    if (Columns <= 1 || Rows <= 1)
       return failure();
 
     Board CurrBoard(Columns, Rows, Squares);
@@ -200,7 +226,7 @@ struct RotateRowMatch : public OpRewritePattern<BuildOp> {
       for (int i = 0; i < OtherDimension; ++i) {
         // Assume the first row will not be rotated
         // That is we will try to match it's color
-        int Color = CurrBoard.getSquare(0, i);
+        int Color = CurrBoard.getSquare(0, i, RowWise);
 
         // Find all possible rotate/don't rotate combinations to find which
         // if any will allow for removal of this column. That is, which rotations
@@ -208,8 +234,8 @@ struct RotateRowMatch : public OpRewritePattern<BuildOp> {
         bool PossibleToRemove = true;
         std::vector<uint64_t> CurrRotateMasks(1, 0);
         for (int j = 1; j < CurrBoard.Rows; ++j) {
-          bool GoodAsIs = CurrBoard.getSquare(j, i) == Color;
-          bool GoodReversed = RotatedBoard.getSquare(j, i) == Color;
+          bool GoodAsIs = CurrBoard.getSquare(j, i, RowWise) == Color;
+          bool GoodReversed = RotatedBoard.getSquare(j, i, RowWise) == Color;
           if (GoodAsIs && GoodReversed) {
             std::vector<uint64_t> NewMasks = CurrRotateMasks;
             for (auto &Mask : NewMasks) {
@@ -239,8 +265,11 @@ struct RotateRowMatch : public OpRewritePattern<BuildOp> {
       }
       return {MaxCount, MaxMask};
     };
-    bool RowWise = true;
-    auto [MaxCount, MaxMask] = FindBestRotation(CurrBoard, RowWise);
+    auto [MaxRowCount, MaxRowMask] = FindBestRotation(CurrBoard, /*RowWise*/true);
+    auto [MaxColumnCount, MaxColumnMask] = FindBestRotation(CurrBoard, /*RowWise*/false);
+    bool RowWise = MaxRowCount >= MaxColumnCount;
+    auto MaxCount = RowWise ? MaxRowCount : MaxColumnCount;
+    auto MaxMask = RowWise ? MaxRowMask : MaxColumnMask;
     if (MaxCount == 0) return failure();
 
     Operation *RotateSeq = BuildRotateSeq(CurrBoard, MaxMask, rewriter, op.getLoc(), RowWise);
