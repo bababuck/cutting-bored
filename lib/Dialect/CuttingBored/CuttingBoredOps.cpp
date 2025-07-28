@@ -233,7 +233,7 @@ struct RotateRowMatch : public OpRewritePattern<BuildOp> {
         // will lead to the column to be all of one color.
         bool PossibleToRemove = true;
         std::vector<uint64_t> CurrRotateMasks(1, 0);
-        for (int j = 1; j < CurrBoard.Rows; ++j) {
+        for (int j = 1; j < RotateDimension; ++j) {
           bool GoodAsIs = CurrBoard.getSquare(j, i, RowWise) == Color;
           bool GoodReversed = RotatedBoard.getSquare(j, i, RowWise) == Color;
           if (GoodAsIs && GoodReversed) {
